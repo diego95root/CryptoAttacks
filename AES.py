@@ -1,19 +1,24 @@
 from Crypto.Cipher import AES
 from random import randint
+from xor import *
 
 def PKCS7(text, length):
 
-    N = (length - (len(text) % length)) % length
+    N = (length - (len(text) % length))
 
     return text + chr(N) * N
 
 def check_PKCS7(text, length):
 
-    for i in range(0, 16):
+    for i in range(1, 17):
         if ord(text[-1]) == i:
             for x in range(i):
                 if ord(text[-(x+1)]) != i:
-                    raise Exception('Padding not valid on {}'.format(text))
+                    return False
+                    #raise Exception('Padding not valid on {}'.format(text))
+            return True
+
+    return False
 
 def generateKey(length):
 
@@ -118,8 +123,6 @@ def oneAtATimeECB(data, prefix=""):
         if (i == 255):
             return secret
 
-######################################
-
 def encryptionOracleCBC(data, key, iv):
 
     s1 = "comment1=cooking%20MCs;userdata="
@@ -155,6 +158,61 @@ def flipBitCBC(encrypted, stringToFind, wantedResult, key, iv):
                 break
 
     return encrypted
+
+class paddingOracleHelper():
+
+    stringList = ["MDAwMDAwTm93IHRoYXQgdGhlIHBhcnR5IGlzIGp1bXBpbmc=","MDAwMDAxV2l0aCB0aGUgYmFzcyBraWNrZWQgaW4gYW5kIHRoZSBWZWdhJ3MgYXJlIHB1bXBpbic=","MDAwMDAyUXVpY2sgdG8gdGhlIHBvaW50LCB0byB0aGUgcG9pbnQsIG5vIGZha2luZw==","MDAwMDAzQ29va2luZyBNQydzIGxpa2UgYSBwb3VuZCBvZiBiYWNvbg==","MDAwMDA0QnVybmluZyAnZW0sIGlmIHlvdSBhaW4ndCBxdWljayBhbmQgbmltYmxl","MDAwMDA1SSBnbyBjcmF6eSB3aGVuIEkgaGVhciBhIGN5bWJhbA==","MDAwMDA2QW5kIGEgaGlnaCBoYXQgd2l0aCBhIHNvdXBlZCB1cCB0ZW1wbw==","MDAwMDA3SSdtIG9uIGEgcm9sbCwgaXQncyB0aW1lIHRvIGdvIHNvbG8=","MDAwMDA4b2xsaW4nIGluIG15IGZpdmUgcG9pbnQgb2g=","MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93"]
+
+    def __init__(self):
+        self.plain = PKCS7(self.stringList[randint(0, len(self.stringList)-1)].decode("base64"), 16).encode("hex")
+        #self.plain = PKCS7(self.stringList[2].decode("base64"), 16).encode("hex")
+        self.key = generateKey(16).encode("hex")
+        self.iv = generateKey(16).encode("hex")
+        self.cipher = encryptAES_CBC(self.plain, self.key, self.iv).encode("hex")
+
+    def check(self, cipher):
+        decrypted = decryptAES_CBC(cipher, self.key, self.iv)
+        return check_PKCS7(decrypted, 16)
+
+def paddingOracleCBC():
+
+    print "===========================\n"
+
+    helper = paddingOracleHelper()
+
+    key = generateKey(16)
+
+    msg = ""
+
+    for block in range(1, len(helper.cipher)/32 + 1):
+
+        b = 32 * block
+
+        message = []
+        intermediates = []
+
+        for x in range(1, 17):
+
+            st = "".join([chr(x ^ intermediates[len(message) - n - 1]).encode('hex') for n in range(len(message))])
+
+            for i in range(0, 256):
+
+                inter = i ^ x
+
+                cipher = key[:-x].encode("hex") + chr(inter).encode("hex") + st + helper.cipher[-b:][:32]
+
+                if helper.check(cipher):
+                    try:
+                        plain = i ^ ord(helper.cipher[-b - 2*x:-b - 2*(x-1)].decode("hex"))
+                    except:
+                        plain = i ^ ord(helper.iv[-2*x:][:2].decode("hex"))
+                    message.append(plain)
+                    intermediates.append(i)
+                    break
+
+        msg = "".join([chr(i) for i in message][::-1]) + msg
+
+    return msg
 
 if __name__ == "__main__":
 
@@ -192,8 +250,8 @@ if __name__ == "__main__":
     print "======================"
 
     check_PKCS7("ICE ICE BABY\x04\x04\x04\x04", 20)
-    #check_PKCS7("ICE ICE BABY\x05\x05\x05\x05", 20)
-    #check_PKCS7("ICE ICE BABY\x01\x02\x03\x04", 20)
+    check_PKCS7("ICE ICE BABY\x05\x05\x05\x05", 20)
+    check_PKCS7("ICE ICE BABY\x01\x02\x03\x04", 20)
 
     ### BIT FLIPPING ATTACK AES MODE_CBC
 
@@ -207,6 +265,10 @@ if __name__ == "__main__":
     print encryptedModified
     print decryptAES_CBC(encrypted, key, iv).strip()
     print decryptAES_CBC(encryptedModified, key, iv).strip()
+
+    ### AES CBC PADDING ORACLE ATTACK
+
+    print paddingOracleCBC()
 
     """
 

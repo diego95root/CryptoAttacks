@@ -51,8 +51,85 @@ def breakFixedNonce(ciphers):
         result.append( xor(ciphers[i].encode("hex"), stream).decode("hex")[:len(ciphers[i])] )
     return result
 
+def editCT(ciphertext, key, offset, newtext):
+    decrypted = decryptAES_CTR(ciphertext, key, 0)
+    modified = (decrypted[:offset] + newtext + decrypted[offset + len(newtext):]).encode("hex")
+    encrypted = encryptAES_CTR(modified, key, 0)
+    return encrypted
+
+def breakRandomAccessCTR(cipher, key):
+
+    plainPrime = "a"*(len(cipher)/2)
+    edited = editCT(cipher, key, 0, plainPrime).encode("hex")
+
+    # Plaintext = plaintext' ^ ciphertext ^ ciphertext'
+    # this is because both ciphertext and ciphertext'
+    # have been xor'ed with the stream and so it cancels
+    return xor(xor(cipher, edited), plainPrime.encode("hex"))
+
+def encryptionOracleCTR(data, key):
+
+    s1 = "comment1=cooking%20MCs;userdata="
+    s2 = ";comment2=%20like%20a%20pound%20of%20bacon"
+
+    msg = s1 + data.replace(";", "").replace("=", "") + s2
+    padded = PKCS7(msg, 16).encode("hex")
+
+    return encryptAES_CTR(padded, key, 0).encode("hex")
+
+def flipBitCTR(encrypted, stringToFind, wantedResult, key):
+
+    differences = []
+
+    block = decryptAES_CTR(encrypted, key, 0).find(stringToFind) / 16
+
+    for i in range(len(stringToFind)):
+        if (stringToFind[i] != wantedResult[i]):
+            differences.append(i)
+
+    for x in differences:
+
+        offset = block*32 + x*2
+        byte = encrypted[offset:offset+2]
+
+        for i in range(0,0xff):
+
+            tmp = encrypted[:offset] + chr(i).encode("hex") + encrypted[offset+2:]
+            decrypted = decryptAES_CTR(tmp, key, 0)
+
+            if decrypted[block*16 + x] == wantedResult[x]:
+                encrypted = tmp
+                break
+
+    return encrypted
+
+
 if __name__ == "__main__":
 
+    key = generateKey(16)
+    encrypted = encryptionOracleCTR("XadminXtrueX", key)
+    print decryptAES_CTR(encrypted, key, 0).strip()
+    encryptedModified = flipBitCTR(encrypted, "XadminXtrueX", ";admin=true;", key)
+    print decryptAES_CTR(encryptedModified, key, 0).strip()
+
+    """
+    with open("/Users/diego/desktop/github/CryptoTools/7.txt", "r") as file:
+
+        text = file.read().strip().decode("base64").encode("hex")
+
+        key = 'YELLOW SUBMARINE'
+
+        plain = decryptAES_ECB(text, key)
+
+    plain = plain.encode("hex")
+    key = generateKey(16)
+    cipher = encryptAES_CTR(plain, key, 0).encode("hex")
+
+    assert breakRandomAccessCTR(cipher, key) == plain
+
+    """
+
+    """
     ciphertext = "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ=="
     cipher = ciphertext.decode("base64").encode("hex")
 
@@ -80,3 +157,4 @@ if __name__ == "__main__":
     print breakFixedNonce(ciphers2)
 
     # MAKE THEM MORE ACCURATE
+    """

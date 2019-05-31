@@ -124,6 +124,29 @@ def oracleMD4(data):
     key = "ABBBcdcadcaddsdcsdassdkjfnsjgkdfjgndjfkgjndfgnjABBBcdcadcaddsdcsdassdkjfnsjgkdfjgndjfkgjndfgnj"
     return md4(key + data)
 
+def timingLeakHMAC():
+    import requests
+
+    hmac = ""
+
+    for i in range(45):
+
+        average = []
+
+        for x in list("abcdef1234567890"):
+
+            start = time.time()
+
+            r = requests.get("http://127.0.0.1:5000/retrieve?file=/etc/passwd&signature=" + hmac + x)
+
+            if r.status_code == 200:
+                assert hmac == "91d4366a3521d09b0f8f605a830c684ed017f7a5"
+                return hmac
+
+            average.append([(time.time() - start) * 1000, x])
+
+        hmac += [x[1] for x in average if x[0] == max([i[0] for i in average])][0]
+        print hmac
 
 if __name__ == "__main__":
 
@@ -183,4 +206,5 @@ if __name__ == "__main__":
 
             break
 
+    timingLeakHMAC()
     #

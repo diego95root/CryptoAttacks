@@ -125,6 +125,8 @@ def oracleMD4(data):
     return md4(key + data)
 
 def timingLeakHMAC():
+
+    # not perfect, might fail due to slow responses from server, difference a bit small
     import requests
 
     hmac = ""
@@ -140,6 +142,7 @@ def timingLeakHMAC():
             r = requests.get("http://127.0.0.1:5000/retrieve?file=/etc/passwd&signature=" + hmac + x)
 
             if r.status_code == 200:
+                hmac += x
                 assert hmac == "91d4366a3521d09b0f8f605a830c684ed017f7a5"
                 return hmac
 

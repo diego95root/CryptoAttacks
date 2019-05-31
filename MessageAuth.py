@@ -124,32 +124,37 @@ def oracleMD4(data):
     key = "ABBBcdcadcaddsdcsdassdkjfnsjgkdfjgndjfkgjndfgnjABBBcdcadcaddsdcsdassdkjfnsjgkdfjgndjfkgjndfgnj"
     return md4(key + data)
 
-def timingLeakHMAC():
+def timingLeakHMAC(file):
 
-    # not perfect, might fail due to slow responses from server, difference a bit small
     import requests
 
     hmac = ""
 
     for i in range(45):
 
-        average = []
+        maxs = []
 
-        for x in list("abcdef1234567890"):
+        for n in range(8):
 
-            start = time.time()
+            average = []
 
-            r = requests.get("http://127.0.0.1:5000/retrieve?file=/etc/passwd&signature=" + hmac + x)
+            for x in list("abcdef1234567890"):
 
-            if r.status_code == 200:
-                hmac += x
-                assert hmac == "91d4366a3521d09b0f8f605a830c684ed017f7a5"
-                return hmac
+                start = time.time()
 
-            average.append([(time.time() - start) * 1000, x])
+                r = requests.get("http://127.0.0.1:5000/retrieve?file=" + file + "&signature=" + hmac + x)
 
-        hmac += [x[1] for x in average if x[0] == max([i[0] for i in average])][0]
-        print hmac
+                if r.status_code == 200:
+                    hmac += x
+                    return hmac
+
+                average.append([(time.time() - start) * 1000, x])
+
+            maxs.append([x[1] for x in average if x[0] == max([i[0] for i in average])][0])
+
+        hmac += max(set(maxs), key=maxs.count)
+
+    return hmac
 
 if __name__ == "__main__":
 
@@ -209,5 +214,7 @@ if __name__ == "__main__":
 
             break
 
-    timingLeakHMAC()
+    hmac = timingLeakHMAC("/etc/passwd")
+    print hmac
+    assert hmac == "91d4366a3521d09b0f8f605a830c684ed017f7a5"
     #

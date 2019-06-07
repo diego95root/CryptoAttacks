@@ -2,6 +2,7 @@ from flask import Flask, request
 from xor import *
 from SHA1 import *
 from time import sleep
+from hashlib import sha256
 
 app = Flask(__name__)
 
@@ -21,6 +22,23 @@ def HMAC_sha1(key, message):
     i_key_pad = xor(key.encode("hex"), ("36" * blockSize)).decode("hex")
 
     return sha1(o_key_pad + sha1(i_key_pad + message).decode("hex"))[:outputSize*2]
+
+def HMAC_sha256(key, message):
+
+    # 64-byte blocks and 32-byte output for SHA256
+    blockSize = 64
+    outputSize = 32
+
+    if len(key) > blockSize:
+        key = sha256(key).hexdigest()
+
+    elif len(key) < blockSize:
+        key += b'\x00' * (blockSize - len(key))
+
+    o_key_pad = xor(key.encode("hex"), ("5c" * blockSize)).decode("hex")
+    i_key_pad = xor(key.encode("hex"), ("36" * blockSize)).decode("hex")
+
+    return sha256(o_key_pad + sha256(i_key_pad + message).hexdigest().decode("hex")).hexdigest()[:outputSize*2]
 
 
 def compareGood(s1, s2):

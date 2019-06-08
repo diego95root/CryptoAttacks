@@ -36,6 +36,7 @@ class Server():
         u = int(uH, 16)
 
         S = modexp(A * modexp(self.v, u, self.N), self.b, self.N)
+
         self.K = sha256(str(S)).hexdigest()
 
     def sendHMAC_256(self, message):
@@ -65,7 +66,8 @@ class Client():
         xH = sha256(salt + self.P).hexdigest()
         x = int(xH, 16)
 
-        S = pow(B - self.k * modexp(self.g, x, self.N), self.a + u * x, self.N)
+        S = modexp(B - self.k * modexp(self.g, x, self.N), self.a + u * x, self.N)
+
         self.K = sha256(str(S)).hexdigest()
 
     def sendHMAC_256(self, message):
@@ -88,6 +90,9 @@ if __name__ == "__main__":
 
     I, A = client.sendOne()
     salt, B = server.sendOne()
+
+    # Challenge 37: setting A to 0 or any multiple of N results in SHA256("0"), as the modexp results in 0 in S
+    # A = N * 3
 
     client.compute(salt, B)
     server.compute(I, A)

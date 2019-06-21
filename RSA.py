@@ -130,9 +130,7 @@ class BleichenbacherOracle(RSA):
 
     def sign(self, data):
 
-        padded = PKCS15(sha1(data), self.n, 'SHA-1')
-        number = int(padded.encode("hex"), 16)
-        return self.decrypt(number)
+        return self.decrypt(bytes_to_long(data))
 
     def check(self, signature, message):
 

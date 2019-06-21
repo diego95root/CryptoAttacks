@@ -99,6 +99,69 @@ class recoveryOracle():
         self.decrypted.append(hash)
         return self.rsa.decrypt(data)
 
+def PKCS15(data, N, algo):
+
+    ASN1 = {
+        'MD5': '\x30\x20\x30\x0c\x06\x08\x2a\x86\x48\x86\xf7\x0d\x02\x05\x05\x00\x04\x10',
+        'SHA-1': '\x30\x21\x30\x09\x06\x05\x2b\x0e\x03\x02\x1a\x05\x00\x04\x14',
+        'SHA-256': '\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01\x05\x00\x04\x20',
+        'SHA-384': '\x30\x41\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x02\x05\x00\x04\x30',
+        'SHA-512': '\x30\x51\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x03\x05\x00\x04\x40',
+    }
+
+    try:
+        extraFs = 1
+        final = "\x00\x01" + "\xff" * extraFs + "\x00" + ASN1[algo] + data.decode("hex")
+        return final
+    except:
+        print "[*] Algorithm not available"
+
+def cubeRoot(x):
+
+    y, y1 = 0, 2
+
+    while y1 != y:
+        y = y1
+        y1 = (y*(y**3+2*x))//(2*y**3+x)
+
+    return y + 1
+
+class BleichenbacherOracle(RSA):
+
+    def sign(self, data):
+
+        padded = PKCS15(sha1(data), self.n, 'SHA-1')
+        number = int(padded.encode("hex"), 16)
+        return self.decrypt(number)
+
+    def check(self, signature, message):
+
+        all = "\x00" + long_to_bytes(signature ** 3)
+
+        #verify padding, if not return 0
+        if all[:3] == "\x00\x01\xff":
+            ind = 3
+            while all[ind] != "\x00":
+                if all[ind] != "\xff":
+                    return False
+                ind += 1
+            """
+            # correct implementation checks for leftovers at the end
+
+            ind += 35
+            if len(all[ind:]) != 0:
+                return False
+            """
+        else:
+            return False
+
+        #return whether hashes are the same
+        recovered_hash = all.split("\x00")
+        start = len(recovered_hash[1]) + 2 + 15
+        recovered_hash = all[start:start+20].encode("hex")
+
+        return sha1(message) == recovered_hash
+
 ################ CHALLENGE FUNCTIONS ##########################
 
 def rsaTest():
@@ -163,8 +226,31 @@ def messageRecovery():
 
     assert recovered == message == original
 
+def BleichenbacherAttack():
+
+    e = 3
+    p, q = getCoprimes(e)
+    oracle = BleichenbacherOracle(p, q, e)
+
+    n = oracle.n
+    msg = "hi mom"
+    padded = PKCS15(sha1(msg), n, 'SHA-1')
+
+    #extend the message to be 1024 bits / 256 bytes
+    print "[*] Starting padding of message:"
+    print "[*] Lenght of padded    :", len(padded)
+    print "[*] Length of added hex :", len(("\x00"  * ((256 - len(padded)))))
+    padded += ("\x00"  * ((256 - len(padded))))
+    print "[*] Final length        :", len(padded)
+
+    number = int(padded.encode("hex"), 16)
+    signature = cubeRoot(number)
+
+    print "[*] The Bleichenbacher Oracle says the signature is:", oracle.check(signature, msg)
+
 if __name__ == "__main__":
 
     rsaTest()
     broadcastTest()
     messageRecovery()
+    BleichenbacherAttack()

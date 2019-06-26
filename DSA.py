@@ -46,6 +46,37 @@ def bruteforce_k(args, max):
     print "[*] No k found, tried {} possible values".format(k)
     return (0, 0)
 
+def bruteforce_repeated_k(args, dataList):
+
+    p, q, g, y = args
+
+    for i in range(0, len(dataList)):
+        for j in range(i + 1, len(dataList)):
+
+            try:
+                msg1, s1, r1, m1 = dataList[i]
+                msg2, s2, r2, m2 = dataList[j]
+
+                num = int(m1, 16) - int(m2, 16)
+                tmpDivisor = int(s1) - int(s2)
+                div = modinv(tmpDivisor, q)
+
+                k = (num * div) % q
+
+                x = ((int(s1) * k - int(sha1(msg1), 16)) * modinv(int(r1), q)) % q
+
+                assert y == modexp(g, x, p)
+
+                if sha1(hex(x)[2:-1]) == "ca8f6f7c66fa362d40760d135b763eb8527d3d52":
+
+                    return (k, x)
+
+            except:
+                pass
+
+    print "[*] No k was repeated (possibly)"
+    return (0, 0)
+
 def DSA_test():
     message = "DSA is fun!"
     p = 0x800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1
@@ -102,31 +133,11 @@ def DSA_from_repeated_k():
 
     f.close()
 
-    for i in range(0, len(dataList)):
-        for j in range(i + 1, len(dataList)):
+    k, x = bruteforce_repeated_k([p, q, g, y], dataList)
 
-            try:
-                msg1, s1, r1, m1 = dataList[i]
-                msg2, s2, r2, m2 = dataList[j]
-
-                num = int(m1, 16) - int(m2, 16)
-                tmpDivisor = int(s1) - int(s2)
-                div = modinv(tmpDivisor, q)
-
-                k = (num * div) % q
-
-                x = ((int(s1) * k - int(sha1(msg1), 16)) * modinv(int(r1), q)) % q
-
-                assert y == modexp(g, x, p)
-
-                if sha1(hex(x)[2:-1]) == "ca8f6f7c66fa362d40760d135b763eb8527d3d52":
-
-                    print "[*] Multiple key attack started!"
-                    print "[*] k recovered    :", k
-                    print "[*] private key (x):", x
-
-            except:
-                pass
+    print "[*] Multiple key attack started!"
+    print "[*] k recovered    :", k
+    print "[*] private key (x):", x
 
 if __name__ == "__main__":
 

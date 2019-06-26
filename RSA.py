@@ -134,6 +134,8 @@ class BleichenbacherOracle(RSA):
 
     def check(self, signature, message):
 
+        # check is like this: S^e == PAD(H(m))
+
         all = "\x00" + long_to_bytes(signature ** 3)
 
         #verify padding, if not return 0
